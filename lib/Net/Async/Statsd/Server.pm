@@ -20,7 +20,7 @@ Net::Async::Statsd::Server - asynchronous server for Etsy's statsd protocol
  ));
  $statsd->bus->subscribe_to_event(
   count => sub {
-   my ($ev, $k, $delta, $type, $
+   my ($ev, $k, $delta, $type) = @_;
   }
  );
 
@@ -46,8 +46,28 @@ statsd writes are slow.
 
 =cut
 
+=head2 host
+
+Which host to listen on. Probably want '0.0.0.0' (set via L</configure>)
+here if you want to listen on all addresses.
+
+=cut
+
 sub host { shift->{host} }
+
+=head2 port
+
+The UDP port we'll accept traffic on. Use L</configure> to set it.
+
+=cut
+
 sub port { shift->{port} }
+
+=head2 configure
+
+Used for setting values.
+
+=cut
 
 sub configure {
 	my ($self, %args) = @_;
@@ -56,6 +76,12 @@ sub configure {
 	}
 	$self->SUPER::configure(%args);
 }
+
+=head2 listening
+
+Resolves with the port number when the UDP server is listening.
+
+=cut
 
 sub listening {
 	my ($self) = @_;

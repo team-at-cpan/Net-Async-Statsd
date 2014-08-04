@@ -182,9 +182,28 @@ sub decrement {
 	);
 }
 
+=head2 configure
+
+Standard L<IO::Async::Notifier> configuration - called on construction or
+manually when values need updating.
+
+Accepts the following named parameters:
+
+=over 4
+
+=item * host - the host we'll connect to
+
+=item * port - the UDP port to send messages to
+
+=item * default_rate - default sampling rate when none is provided for a given call
+
+=back
+
+=cut
+
 sub configure {
 	my ($self, %args) = @_;
-	for (qw(port host)) {
+	for (qw(port host default_rate)) {
 		$self->{$_} = delete $args{$_} if exists $args{$_};
 	}
 	$self->SUPER::configure(%args);
@@ -236,11 +255,11 @@ sub sample {
 
 =head2 default_rate
 
-Default sampling rate. Currently hardcoded to 1.
+Default sampling rate. Currently 1 if not overidden in constructor or L</configure>.
 
 =cut
 
-sub default_rate { 1 }
+sub default_rate { shift->{default_rate} // 1 }
 
 =head2 port
 
