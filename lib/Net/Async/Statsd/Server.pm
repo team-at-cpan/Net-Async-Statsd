@@ -18,10 +18,24 @@ Net::Async::Statsd::Server - asynchronous server for Etsy's statsd protocol
  $loop->add(my $statsd = Net::Async::Statsd::Server->new(
    port => 3001,
  ));
+ $statsd->bus->subscribe_to_event(
+  count => sub {
+   my ($ev, $k, $delta, $type, $
+  }
+ );
 
 =head1 DESCRIPTION
 
 Provides an asynchronous server for the statsd API.
+
+=cut
+
+use curry;
+use Socket qw(SOCK_DGRAM);
+use IO::Socket::IP;
+use IO::Async::Socket;
+
+use Net::Async::Statsd::Bus;
 
 =head1 METHODS
 
@@ -35,38 +49,85 @@ statsd writes are slow.
 sub host { shift->{host} }
 sub port { shift->{port} }
 
+sub configure {
+	my ($self, %args) = @_;
+	for (qw(port host)) {
+		$self->{$_} = delete $args{$_} if exists $args{$_};
+	}
+	$self->SUPER::configure(%args);
+}
+
+sub listening {
+	my ($self) = @_;
+	$self->{listening} ||= do {
+		$self->listen
+	}
+}
+
 =head2 listen
 
 Establishes the underlying UDP socket.
 
 =cut
 
-sub connect {
+sub listen {
 	my ($self) = @_;
-	# IO::Async::Loop
-	$self->loop->listen(
-		family    => 'inet',
-		socktype  => 'dgram',
-		service   => $self->port,
-		host      => $self->host,
-		on_socket => $self->curry::on_socket,
+
+	my $f = $self->loop->new_future;
+	my $sock = IO::Socket::IP->new(
+		Proto     => 'udp',
+		ReuseAddr => 1,
+		Type      => SOCK_DGRAM,
+		LocalPort => $self->port // 0,
+		Listen    => $self->listen_backlog,
+		Blocking  => 0,
+	) or die "No bind: $@\n";
+	$self->{port} = $sock->sockport;
+	my $ias = IO::Async::Socket->new(
+		handle        => $sock,
+		on_recv       => $self->curry::on_recv,
+		on_recv_error => $self->curry::on_recv_error,
 	);
+	$self->add_child($ias);
+	$f->done($self->port);
 }
 
-=head2 on_socket
+=head2 bus
 
-Called when the socket is established.
+Returns the L<Net::Async::Statsd::Bus> instance for this server.
+
+This object exists purely for the purpose of dispatching events.
 
 =cut
 
-sub on_socket {
-	my ($self, $sock) = @_;
-	$self->debug_printf("UDP socket established: %s", $sock->write_handle->sockhost_service);
-	$sock->configure(
-		on_recv       => $self->curry::weak::on_recv,
-		on_recv_error => $self->curry::weak::on_recv_error,
-	);
-	$self->add_child($sock);
+sub bus { shift->{bus} ||= Net::Async::Statsd::Bus->new }
+
+=head2 listen_backlog
+
+Default listen backlog. Immutable, set to 4096 for no particular reason.
+
+=cut
+
+sub listen_backlog { 4096 }
+
+{
+my %type = (
+	ms => 'timing',
+	c => 'count',
+	g => 'gauge',
+);
+
+=head2 type_for_char
+
+Badly-named lookup method - returns the type matching the given characters.
+
+=cut
+
+sub type_for_char {
+	my ($self, $char) = @_;
+	die "no character?" unless defined $char;
+	return $type{$char};
+}
 }
 
 =head2 on_recv
@@ -77,11 +138,28 @@ Called if we receive data.
 
 sub on_recv {
 	my ($self, undef, $dgram, $addr) = @_;
-	$self->debug_printf("UDP packet received from %s", join ':', $self->loop->resolver->getnameinfo(
+	$self->loop->resolver->getnameinfo(
 		addr    => $addr,
 		numeric => 1,
 		dgram   => 1,
-	));
+	)->on_done(sub {
+		my ($host, $port) = @_;
+		$self->debug_printf("UDP packet received from %s", join ':', $host, $port);
+		my ($k, $v, $type_char, $rate) = $dgram =~ /^([^:]+):([^|]+)\|([^|]+)(?:\|\@(.+))?$/ or warn "Invalid dgram: $dgram";
+		$rate ||= 1;
+		my $type = $self->type_for_char($type_char) // 'unknown';
+		$self->bus->invoke_event(
+			$type => ($k, $v, $rate, $host, $port)
+		);
+		$self->debug_printf(
+			"dgram %s from %s: %s => %s (%s)",
+			$dgram,
+			join(':', $host, $port),
+			$k,
+			$v,
+			$type
+		);
+	});
 }
 
 =head2 on_recv_error

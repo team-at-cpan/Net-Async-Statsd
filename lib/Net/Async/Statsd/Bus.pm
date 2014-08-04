@@ -17,6 +17,8 @@ Used internally by L<Net::Async::Statsd::Server>.
 
 use constant EVENT_DISPATCH_ON_FALLBACK => 0;
 
+sub new { my $class = shift; bless { @_ }, $class }
+
 1;
 
 __END__
