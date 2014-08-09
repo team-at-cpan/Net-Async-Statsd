@@ -3,6 +3,7 @@ requires 'curry', 0;
 requires 'Future', '>= 0.29';
 requires 'IO::Async', '>= 0.62';
 requires 'Socket', '>= 2.000';
+requires 'IO::Socket::IP', 0;
 requires 'Mixin::Event::Dispatch', '>= 1.000';
 
 on 'test' => sub {
