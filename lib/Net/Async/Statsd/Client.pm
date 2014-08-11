@@ -231,12 +231,13 @@ sub queue_stat {
 
 	# Append rate if we're only sampling part of the data
 	$v .= '|@' . $rate if $rate < 1;
-	$self->statsd->then(sub {
+	my $f;
+	$f = $self->statsd->then(sub {
 		# FIXME Someday IO::Async::Socket may support
 		# Futures for UDP send, update this if/when
 		# that happens.
 		shift->send("$k:$v");
-		Future->wrap
+		Future->wrap->on_ready(sub { undef $f });
 	});
 }
 
