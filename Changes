@@ -8,6 +8,9 @@ Revision history for {{$dist->name}}
 	as a precaution for when UDP ->send gains the ability to resolve the
 	future on completion
 
+	Dependency fixes:
+	* sum0 is a relatively new addition to List::Util
+
 0.002     2014-08-09 18:25:21+01:00 Europe/London
 	No new features
 
