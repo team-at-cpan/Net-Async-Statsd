@@ -237,8 +237,8 @@ sub queue_stat {
 		# Futures for UDP send, update this if/when
 		# that happens.
 		shift->send("$k:$v");
-		Future->wrap->on_ready(sub { undef $f });
-	});
+		Future->wrap
+	})->on_ready(sub { undef $f });
 }
 
 =head2 sample
