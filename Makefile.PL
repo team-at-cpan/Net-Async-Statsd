@@ -23,6 +23,7 @@ my %WriteMakefileArgs = (
     "Future" => "0.29",
     "IO::Async" => "0.62",
     "IO::Socket::IP" => 0,
+    "List::Util" => "1.38",
     "Mixin::Event::Dispatch" => "1.000",
     "Socket" => "2.000",
     "curry" => 0,
@@ -36,7 +37,7 @@ my %WriteMakefileArgs = (
     "Test::Fatal" => "0.010",
     "Test::More" => "0.98"
   },
-  "VERSION" => "0.002",
+  "VERSION" => "0.003",
   "test" => {
     "TESTS" => "t/*.t"
   }
@@ -50,6 +51,7 @@ my %FallbackPrereqs = (
   "IO::Handle" => 0,
   "IO::Socket::IP" => 0,
   "IPC::Open3" => 0,
+  "List::Util" => "1.38",
   "Mixin::Event::Dispatch" => "1.000",
   "Socket" => "2.000",
   "Test::CheckDeps" => "0.010",
