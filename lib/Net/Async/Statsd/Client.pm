@@ -197,13 +197,15 @@ Accepts the following named parameters:
 
 =item * default_rate - default sampling rate when none is provided for a given call
 
+=item * prefix - string to prepend to any stats we record
+
 =back
 
 =cut
 
 sub configure {
 	my ($self, %args) = @_;
-	for (qw(port host default_rate)) {
+	for (qw(port host default_rate prefix)) {
 		$self->{$_} = delete $args{$_} if exists $args{$_};
 	}
 	$self->SUPER::configure(%args);
@@ -228,6 +230,8 @@ sub queue_stat {
 
 	$rate //= $self->default_rate;
 	return Future->wrap unless $self->sample($rate);
+
+	$k = $self->{prefix} . '.' . $k if exists $self->{prefix};
 
 	# Append rate if we're only sampling part of the data
 	$v .= '|@' . $rate if $rate < 1;
