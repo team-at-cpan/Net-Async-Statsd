@@ -171,7 +171,7 @@ sub on_recv {
 	)->on_done(sub {
 		my ($host, $port) = @_;
 		$self->debug_printf("UDP packet received from %s", join ':', $host, $port);
-		my ($k, $v, $type_char, $rate) = $dgram =~ /^([^:]+):([^|]+)\|([^|]+)(?:\|\@(.+))?$/ or warn "Invalid dgram: $dgram";
+		my ($k, $v, $type_char, $rate) = $dgram =~ /^([^:]+):([^|]+)\|([^|\n]+)(?:\|\@(.+))?$/ or warn "Invalid dgram: $dgram";
 		$rate ||= 1;
 		my $type = $self->type_for_char($type_char) // 'unknown';
 		$self->bus->invoke_event(
