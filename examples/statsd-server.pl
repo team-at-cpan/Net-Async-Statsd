@@ -9,7 +9,7 @@ use List::Util qw(sum min max);
 
 my $loop = IO::Async::Loop->new;
 my $srv = Net::Async::Statsd::Server->new(
-	port => 8001,
+	port => 8125,
 );
 $loop->add($srv);
 $srv->listening->get;
