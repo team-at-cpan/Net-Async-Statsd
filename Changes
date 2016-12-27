@@ -1,6 +1,8 @@
 Revision history for {{$dist->name}}
 
 {{$NEXT}}
+
+0.005     2016-12-27 20:34:39+08:00 Asia/Kuala_Lumpur
 	New features:
 	* Server protocol accepts (and ignores) extra information on a line, such as
 	tags or comments
