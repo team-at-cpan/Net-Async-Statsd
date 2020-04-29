@@ -171,20 +171,22 @@ sub on_recv {
 	)->on_done(sub {
 		my ($host, $port) = @_;
 		$self->debug_printf("UDP packet received from %s", join ':', $host, $port);
-		my ($k, $v, $type_char, $rate) = $dgram =~ /^([^:]+):([^|]+)\|([^|]+)(?:\|\@(.+))?/ or warn "Invalid dgram: $dgram";
-		$rate ||= 1;
-		my $type = $self->type_for_char($type_char) // 'unknown';
-		$self->bus->invoke_event(
-			$type => ($k, $v, $rate, $host, $port)
-		);
-		$self->debug_printf(
-			"dgram %s from %s: %s => %s (%s)",
-			$dgram,
-			join(':', $host, $port),
-			$k,
-			$v,
-			$type
-		);
+		foreach my $stat (split m/\n/, $dgram) {
+			my ($k, $v, $type_char, $rate) = $stat =~ /^([^:]+):([^|]+)\|([^|]+)(?:\|\@(.+))?/ or warn "Invalid dgram: $stat";
+			$rate ||= 1;
+			my $type = $self->type_for_char($type_char) // 'unknown';
+			$self->bus->invoke_event(
+				$type => ($k, $v, $rate, $host, $port)
+			);
+			$self->debug_printf(
+				"dgram %s from %s: %s => %s (%s)",
+				$stat,
+				join(':', $host, $port),
+				$k,
+				$v,
+				$type
+			);
+		}
 	});
 }
 

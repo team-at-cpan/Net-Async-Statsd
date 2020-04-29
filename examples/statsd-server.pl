@@ -23,7 +23,7 @@ for(qw(count gauge timing)) {
 		$type => sub {
 			my ($ev, $k, $v) = @_;
 			if($type eq 'count') {
-				++$count{$k};
+				$count{$k} += $v;
 				say "$type - $k = " . $count{$k};
 			} elsif($type eq 'timing') {
 				unshift @{$timing{$type} ||= []}, $v;
