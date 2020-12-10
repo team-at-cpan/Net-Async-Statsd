@@ -224,7 +224,7 @@ sub event {
         }
     }
 
-    $self->statsd->on_done(sub { shift->send("$event_string_data") });
+    $self->statsd->on_done(sub { shift->send($event_string_data) });
 }
 
 =head2 configure
