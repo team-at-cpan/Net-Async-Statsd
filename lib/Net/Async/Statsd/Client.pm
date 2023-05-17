@@ -56,6 +56,8 @@ Records timing information in milliseconds. Takes up to three parameters:
 
 =item * $rate - optional sampling rate
 
+=item * $tags - optional hashref of key/value tags
+
 =back
 
 Only the integer part of the elapsed time will be sent.
@@ -69,12 +71,13 @@ Returns a L<Future> which will be resolved when the write completes.
 =cut
 
 sub timing {
-	my ($self, $k, $v, $rate) = @_;
+    my ($self, $k, $v, $rate, $tags) = @_;
 
-	$self->queue_stat(
-		$k => int($v) . '|ms',
-		$rate
-	);
+    $self->queue_stat(
+        $k => int($v) . '|ms',
+        $rate,
+        $tags // ()
+    );
 }
 
 =head2 gauge
@@ -89,6 +92,8 @@ Records a current value. Takes up to three parameters:
 
 =item * $rate - optional sampling rate
 
+=item * $tags - optional hashref of key/value tags
+
 =back
 
 Only the integer value will be sent.
@@ -102,12 +107,13 @@ Returns a L<Future> which will be resolved when the write completes.
 =cut
 
 sub gauge {
-	my ($self, $k, $v, $rate) = @_;
+    my ($self, $k, $v, $rate, $tags) = @_;
 
-	$self->queue_stat(
-		$k => int($v) . '|g',
-		$rate
-	);
+    $self->queue_stat(
+        $k => int($v) . '|g',
+        $rate,
+        $tags // ()
+    );
 }
 
 =head2 delta
@@ -122,6 +128,8 @@ Records changed value. Takes up to three parameters:
 
 =item * $rate - optional sampling rate
 
+=item * $tags - optional hashref of key/value tags
+
 =back
 
 Values are truncated to integers.
@@ -135,12 +143,13 @@ Returns a L<Future> which will be resolved when the write completes.
 =cut
 
 sub delta {
-	my ($self, $k, $v, $rate) = @_;
+    my ($self, $k, $v, $rate, $tags) = @_;
 
-	$self->queue_stat(
-		$k => int($v) . '|c',
-		$rate
-	);
+    $self->queue_stat(
+        $k => int($v) . '|c',
+        $rate,
+        $tags // ()
+    );
 }
 
 =head2 count
@@ -159,12 +168,13 @@ Shortcut for L</delta> with a value of +1.
 =cut
 
 sub increment {
-	my ($self, $k, $rate) = @_;
+    my ($self, $k, $rate, $tags) = @_;
 
-	$self->queue_stat(
-		$k => '1|c',
-		$rate
-	);
+    $self->queue_stat(
+        $k => '1|c',
+        $rate,
+        $tags // (),
+    );
 }
 
 =head2 decrement
@@ -174,12 +184,13 @@ Shortcut for L</delta> with a value of -1.
 =cut
 
 sub decrement {
-	my ($self, $k, $rate) = @_;
+    my ($self, $k, $rate, $tags) = @_;
 
-	$self->queue_stat(
-		$k => '-1|c',
-		$rate
-	);
+    $self->queue_stat(
+        $k => '-1|c',
+        $rate,
+        $tags // (),
+    );
 }
 
 =head2 configure
@@ -204,11 +215,11 @@ Accepts the following named parameters:
 =cut
 
 sub configure {
-	my ($self, %args) = @_;
-	for (qw(port host default_rate prefix)) {
-		$self->{$_} = delete $args{$_} if exists $args{$_};
-	}
-	$self->SUPER::configure(%args);
+    my ($self, %args) = @_;
+    for (qw(port host default_rate prefix)) {
+        $self->{$_} = delete $args{$_} if exists $args{$_};
+    }
+    $self->SUPER::configure(%args);
 }
 
 =head1 INTERNAL METHODS
@@ -226,23 +237,24 @@ Queues a statistic for write.
 =cut
 
 sub queue_stat {
-	my ($self, $k, $v, $rate) = @_;
+    my ($self, $k, $v, $rate, $tags) = @_;
 
-	$rate //= $self->default_rate;
-	return Future->wrap unless $self->sample($rate);
+    $rate //= $self->default_rate;
+    return Future->wrap unless $self->sample($rate);
 
-	$k = $self->{prefix} . '.' . $k if exists $self->{prefix};
+    $k = $self->{prefix} . '.' . $k if exists $self->{prefix};
 
-	# Append rate if we're only sampling part of the data
-	$v .= '|@' . $rate if $rate < 1;
-	my $f;
-	$f = $self->statsd->then(sub {
-		# FIXME Someday IO::Async::Socket may support
-		# Futures for UDP send, update this if/when
-		# that happens.
-		shift->send("$k:$v");
-		Future->wrap
-	})->on_ready(sub { undef $f });
+    # Append rate if we're only sampling part of the data
+    $v .= '|@' . $rate if $rate < 1;
+    $v .= '|#' . join(',', map { $_ . ':' . $tags->{$_} } sort keys %$tags) if $tags and %$tags;
+    my $f;
+    $f = $self->statsd->then(sub {
+        # FIXME Someday IO::Async::Socket may support
+        # Futures for UDP send, update this if/when
+        # that happens.
+        shift->send("$k:$v");
+        Future->wrap
+    })->on_ready(sub { undef $f });
 }
 
 =head2 sample
@@ -253,9 +265,9 @@ we should record this, false otherwise.
 =cut
 
 sub sample {
-	my ($self, $rate) = @_;
-	return 1 if rand() <= $rate;
-	return 0;
+    my ($self, $rate) = @_;
+    return 1 if rand() <= $rate;
+    return 0;
 }
 
 =head2 default_rate
@@ -283,10 +295,10 @@ Statsd host to connect to.
 sub host { shift->{host} }
 
 sub statsd {
-	my ($self) = @_;
-	$self->{statsd} ||= do {
-		$self->connect
-	}
+    my ($self) = @_;
+    $self->{statsd} ||= do {
+        $self->connect
+    }
 }
 
 =head2 connect
@@ -296,15 +308,15 @@ Establishes the underlying UDP socket.
 =cut
 
 sub connect {
-	my ($self) = @_;
-	# IO::Async::Loop
-	$self->loop->connect(
-		family    => 'inet',
-		socktype  => 'dgram',
-		service   => $self->port,
-		host      => $self->host,
-		on_socket => $self->curry::on_socket,
-	);
+    my ($self) = @_;
+    # IO::Async::Loop
+    $self->loop->connect(
+        family    => 'inet',
+        socktype  => 'dgram',
+        service   => $self->port,
+        host      => $self->host,
+        on_socket => $self->curry::on_socket,
+    );
 }
 
 =head2 on_socket
@@ -314,15 +326,15 @@ Called when the socket is established.
 =cut
 
 sub on_socket {
-	my ($self, $sock) = @_;
-	$self->debug_printf("UDP socket established: %s", $sock->write_handle->sockhost_service);
-	# FIXME Don't really want this - we're sending only, no bi-directional shenanigans
-	# required, might need to replace ->connect with an IO::Async::Socket for this?
-	$sock->configure(
-		on_recv       => $self->curry::weak::on_recv,
-		on_recv_error => $self->curry::weak::on_recv_error,
-	);
-	$self->add_child($sock);
+    my ($self, $sock) = @_;
+    $self->debug_printf("UDP socket established: %s", $sock->write_handle->sockhost_service);
+    # FIXME Don't really want this - we're sending only, no bi-directional shenanigans
+    # required, might need to replace ->connect with an IO::Async::Socket for this?
+    $sock->configure(
+        on_recv       => $self->curry::weak::on_recv,
+        on_recv_error => $self->curry::weak::on_recv_error,
+    );
+    $self->add_child($sock);
 }
 
 =head2 on_recv
@@ -332,12 +344,12 @@ Called if we receive data.
 =cut
 
 sub on_recv {
-	my ($self, undef, $dgram, $addr) = @_;
-	$self->debug_printf("UDP packet [%s] received from %s", $dgram, join ':', $self->loop->resolver->getnameinfo(
-		addr    => $addr,
-		numeric => 1,
-		dgram   => 1,
-	));
+    my ($self, undef, $dgram, $addr) = @_;
+    $self->debug_printf("UDP packet [%s] received from %s", $dgram, join ':', $self->loop->resolver->getnameinfo(
+        addr    => $addr,
+        numeric => 1,
+        dgram   => 1,
+    ));
 }
 
 =head2 on_recv_error
@@ -347,8 +359,8 @@ Called if we had an error while receiving.
 =cut
 
 sub on_recv_error {
-	my ($self, undef, $err) = @_;
-	$self->debug_printf("UDP packet receive error: %s", $err);
+    my ($self, undef, $err) = @_;
+    $self->debug_printf("UDP packet receive error: %s", $err);
 }
 
 1;
