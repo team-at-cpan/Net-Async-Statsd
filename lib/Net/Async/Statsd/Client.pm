@@ -193,6 +193,51 @@ sub decrement {
     );
 }
 
+my %OPTS_KEYS = (
+    date_happened    => 'd',
+    hostname         => 'h',
+    aggregation_key  => 'k',
+    priority         => 'p',
+    source_type_name => 's',
+    alert_type       => 't'
+);
+
+=head2 event
+
+Dispatch an event with a title and a text
+
+=over 4
+
+=item * $title - the event title
+
+=item * $text - the event text
+
+=item * $text - the event text
+
+=item * $opts - hashref of event options
+
+=cut
+
+sub event {
+    my ($self, $title, $text, $opts) = @_;
+
+    $opts //= {};
+    $title =~ s/\n/\\n/g;
+    $text =~ s/\n/\\n/g;
+
+    my $event_string_data = sprintf "_e{%d,%d}:%s|%s",
+    length($title), length($text), $title, $text;
+
+    for my $opt ( keys %$opts ) {
+        if ( my $key = $OPTS_KEYS{$opt} ) {
+            $opts->{$opt} =~ s/|//g;
+            $event_string_data .= "|$key:$opts->{$opt}";
+        }
+    }
+
+    $self->statsd->on_done(sub { shift->send($event_string_data) });
+}
+
 =head2 configure
 
 Standard L<IO::Async::Notifier> configuration - called on construction or
